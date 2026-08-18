@@ -46,7 +46,6 @@ flutter:
     - shaders/speed_lines.frag
   assets:
     - assets/rive/
-    - assets/demo/
   fonts:
     - family: SpaceGrotesk
       fonts:
