@@ -9,18 +9,63 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.targets }}
-    runs-on: ${{ matrix.os }}
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Codegen (drift)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android/keystore.jks
+          else
+            echo "No keystore secret — release will fall back to debug signing."
+          fi
+
+      - name: Build APK
+        run: flutter build apk --release
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Name artifact
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/comicko.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: comicko-apk
+          path: build/comicko.apk
+
+  web-linux:
+    name: Build Web + Linux
+    runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            targets: 'android web linux'
-          - os: windows-latest
-            targets: 'windows'
     steps:
       - uses: actions/checkout@v4
 
@@ -37,69 +82,62 @@ jobs:
       - name: Codegen (drift)
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Decode signing keystore
-        if: runner.os == 'Linux'
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-        run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > android/keystore.jks
-          else
-            echo "No keystore secret — release will fall back to debug signing."
-          fi
-
-      - name: Build Android APK
-        if: contains(matrix.targets, 'android')
-        run: flutter build apk --release
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Copy APK to artifact path
-        if: contains(matrix.targets, 'android')
-        run: cp build/app/outputs/flutter-apk/app-release.apk build/comicko.apk
-
       - name: Build web
-        if: contains(matrix.targets, 'web')
         run: |
           flutter build web --release
           dart compile js web/drift_worker.dart -o build/web/drift_worker.js -O4
-
-      - name: Package web
-        if: contains(matrix.targets, 'web')
-        run: |
           cd build/web && zip -r ../comicko-web.zip . && cd ../..
 
       - name: Build Linux
-        if: contains(matrix.targets, 'linux')
         run: |
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev
           flutter build linux --release
           tar -C build/linux/x64/release/bundle -czf build/comicko-linux.tar.gz .
 
+      - name: Upload web + linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: comicko-web-linux
+          path: |
+            build/comicko-web.zip
+            build/comicko-linux.tar.gz
+
+  windows:
+    name: Build Windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Codegen (drift)
+        run: dart run build_runner build --delete-conflicting-outputs
+
       - name: Build Windows
-        if: contains(matrix.targets, 'windows')
         shell: pwsh
         run: |
           flutter build windows --release
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/comicko-windows.zip -Force
 
-      - name: Upload artifacts
+      - name: Upload windows
         uses: actions/upload-artifact@v4
         with:
-          name: comicko-${{ matrix.os }}
-          path: |
-            build/comicko.apk
-            build/comicko-web.zip
-            build/comicko-linux.tar.gz
-            build/comicko-windows.zip
-          if-no-files-found: ignore
+          name: comicko-windows
+          path: build/comicko-windows.zip
 
   release:
     name: Publish ${{ github.ref_name }}
-    needs: build
+    needs: [android, web-linux, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -134,7 +172,8 @@ jobs:
             ### Notes
             - iOS/macOS builds are produced locally with Xcode
               (`flutter build ios|macos --release`).
-            - Android releases signed with the repository's release keystore.
+            - Android releases are signed with the repository's release
+              keystore (secrets `KEYSTORE_B64` etc.).
           files: artifacts/**
           fail_on_unmatched_files: false
           generate_release_notes: true
