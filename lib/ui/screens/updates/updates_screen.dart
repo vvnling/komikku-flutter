@@ -22,7 +22,8 @@ class _UpdatesScreenState extends State<UpdatesScreen> with AutomaticKeepAliveCl
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.app.updates.rebuildUpdateList());
+    final updates = context.app.updates;
+    Future.microtask(updates.rebuildUpdateList);
   }
 
   @override
@@ -60,6 +61,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> with AutomaticKeepAliveCl
                         size: KButtonSize.sm,
                         onTap: checking ? null : () async {
                           final result = await context.app.updates.checkAll();
+                          if (!context.mounted) return;
                           if (result.newChapters > 0) {
                             KToastHost.show(context, '${result.newChapters} new chapters');
                           } else {

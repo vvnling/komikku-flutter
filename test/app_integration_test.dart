@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' show Brightness, FontWeight, SizedBox;
+import 'package:flutter/material.dart' show SizedBox;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,10 +17,6 @@ import 'package:comicko/data/sources/source.dart';
 import 'package:comicko/ui/screens/reader/chapter_session.dart';
 import 'package:comicko/main.dart';
 
-const _scale = [
-  (40.0, FontWeight.w700, 1.05, -1.0),
-  (17.0, FontWeight.w600, 1.3, 0.0),
-];
 
 Future<AppServices> makeServices() async {
   SharedPreferences.setMockInitialValues({});

@@ -55,6 +55,7 @@ class _HistoryScreenState extends State<HistoryScreen> with AutomaticKeepAliveCl
                         size: KButtonSize.sm,
                         onTap: () async {
                           await context.app.repos.clearHistory();
+                          if (!context.mounted) return;
                           KToastHost.show(context, 'History cleared');
                         },
                       ),
@@ -106,8 +107,9 @@ class _HistoryRowState extends State<_HistoryRow> {
   }
 
   Future<void> _load() async {
-    final manga = await context.app.repos.mangaById(widget.entry.mangaId);
-    final chapter = (await context.app.repos.chaptersOfManga(widget.entry.mangaId)).where((c) => c.id == widget.entry.chapterId).firstOrNull;
+    final repos = context.app.repos;
+    final manga = await repos.mangaById(widget.entry.mangaId);
+    final chapter = (await repos.chaptersOfManga(widget.entry.mangaId)).where((c) => c.id == widget.entry.chapterId).firstOrNull;
     if (mounted) {
       setState(() {
       _manga = manga;
@@ -118,8 +120,6 @@ class _HistoryRowState extends State<_HistoryRow> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.kTheme;
-    final c = theme.colors;
     final m = _manga;
     if (m == null) return const SizedBox.shrink();
 

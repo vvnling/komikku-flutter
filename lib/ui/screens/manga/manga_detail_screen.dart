@@ -52,10 +52,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
       setState(() => _error = 'Invalid manga key');
       return;
     }
-    final manga = await context.app.repos.mangaByKey(parts[0], parts[1]);
+    final app = context.app;
+    final manga = await app.repos.mangaByKey(parts[0], parts[1]);
     if (manga == null) {
       // not in library — fetch from source
-      final source = context.app.sources.byId(parts[0]);
+      final source = app.sources.byId(parts[0]);
       if (source == null) {
         setState(() {
           _loading = false;
@@ -65,7 +66,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
       }
       try {
         final sm = await source.getMangaDetail(parts[1]);
-        final stored = await context.app.library.addToLibrary(sm);
+        final stored = await app.library.addToLibrary(sm);
         _init(stored, const []);
       } catch (e) {
         setState(() {
@@ -75,7 +76,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
       }
       return;
     }
-    final chapters = await context.app.repos.chaptersOfManga(manga.id!);
+    final chapters = await app.repos.chaptersOfManga(manga.id!);
     _init(manga, chapters);
   }
 
@@ -95,10 +96,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
   Future<void> _refresh() async {
     final manga = _manga;
     if (manga == null || _refreshing) return;
+    final app = context.app;
     setState(() => _refreshing = true);
     try {
-      final updated = await context.app.library.refreshManga(manga);
-      final chapters = await context.app.repos.chaptersOfManga(updated.id!);
+      final updated = await app.library.refreshManga(manga);
+      final chapters = await app.repos.chaptersOfManga(updated.id!);
       if (mounted) {
         setState(() {
         _manga = updated;
@@ -240,7 +242,6 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
   }
 
   Widget _hero(KTheme theme, Manga manga, Source? source) {
-    final c = theme.colors;
     final w = MediaQuery.sizeOf(context).width;
     final coverH = w * 0.62;
     return Column(
@@ -374,7 +375,6 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
   }
 
   Widget _tabBar(KTheme theme) {
-    final c = theme.colors;
     return Padding(
       padding: const EdgeInsets.fromLTRB(KSpacing.l, KSpacing.l, KSpacing.l, 0),
       child: KTabBar(
@@ -461,6 +461,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
           leading: Icon(ch.read ? Icons.undo : Icons.done_all, size: 19, color: c.inkMuted),
           onTap: () async {
             await context.app.repos.setChapterRead(ch, !ch.read);
+            if (!mounted) return;
             KRoute.pop(context);
             setState(() {});
           },
@@ -483,6 +484,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
           leading: Icon(Icons.bookmark_outline, size: 19, color: c.inkMuted),
           onTap: () async {
             await context.app.repos.updateChapter(ch.copyWith(bookmark: !ch.bookmark));
+            if (!mounted) return;
             KRoute.pop(context);
             setState(() {});
           },
@@ -595,7 +597,8 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
       status: manga.status,
       coverUrl: manga.coverUrl,
     ));
-    if (mounted) setState(() => _manga = _manga!.copyWith(favorite: true));
+    if (!mounted) return;
+    setState(() => _manga = _manga!.copyWith(favorite: true));
     KToastHost.show(context, 'Added to library');
   }
 
@@ -617,8 +620,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
       ],
     ));
     if (confirmed != true) return;
-    await context.app.library.removeFromLibrary(_manga!);
-    if (mounted) KRoute.pop(context);
+    if (!mounted) return;
+    final library = context.app.library;
+    await library.removeFromLibrary(_manga!);
+    if (!mounted) return;
+    KRoute.pop(context);
   }
 
   Future<void> _downloadNext() async {
@@ -629,6 +635,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
       return;
     }
     await context.app.downloads.enqueueAll(manga, next);
+    if (!mounted) return;
     KToastHost.show(context, 'Queued ${next.length} chapters');
   }
 
@@ -655,6 +662,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen> with SingleTicker
             const SizedBox(width: 8),
             KButton(label: 'Save', onTap: () async {
               await context.app.repos.updateManga(manga.copyWith(title: title.text, author: author.text.isEmpty ? null : author.text, description: desc.text));
+              if (!mounted) return;
               KRoute.pop(context);
               setState(() {});
               _refresh();

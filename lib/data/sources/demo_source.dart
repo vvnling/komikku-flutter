@@ -54,10 +54,10 @@ class DemoSource extends Source {
   }
 
   Future<String> _coverPath(String mangaId) async {
+    final meta = _mangas.firstWhere((m) => m.id == mangaId);
     final dir = await _artDir();
     final f = File('${dir.path}/cover_$mangaId.jpg');
     if (!f.existsSync()) {
-      final meta = _mangas.firstWhere((m) => m.id == mangaId);
       final png = await DemoArt.cover(mangaId, meta.title);
       f.writeAsBytesSync(DemoArt.downscale(png, maxW: 240));
     }
@@ -164,7 +164,6 @@ class DemoSource extends Source {
 
   @override
   Future<List<SourceManga>> getSuggestions(String mangaId) async {
-    final meta = _mangas.firstWhere((m) => m.id == mangaId);
     final others = _mangas.where((m) => m.id != mangaId).toList()..sort((a, b) => a.tags.first.compareTo(b.tags.first));
     await Future<void>.delayed(const Duration(milliseconds: 120));
     return others.take(4).map((m) => _toSourceManga(m)).toList();

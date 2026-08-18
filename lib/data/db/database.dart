@@ -1,5 +1,8 @@
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart' show NativeDatabase;
+
+// ignore: uri_does_not_exist
+import 'db_factory_stub.dart'
+    if (dart.library.ffi) 'db_factory_native.dart' show openMemoryDb;
 
 // Web builds use drift's wasm database; the stub keeps VM/test builds free
 // of dart:js_interop (drift's wasm support is web-only).
@@ -169,7 +172,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// In-memory database for tests.
-  AppDatabase.memory() : super(NativeDatabase.memory());
+  AppDatabase.memory() : super(openMemoryDb());
 
   @override
   int get schemaVersion => 1;

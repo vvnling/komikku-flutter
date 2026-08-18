@@ -154,6 +154,7 @@ class _SearchScreenState extends State<SearchScreen> {
           onTap: () => KRoute.push(context, MangaDetailScreen(mangaKey: m.key)),
           onLongPress: () async {
             await context.app.library.addToLibrary(m);
+            if (!context.mounted) return;
             KToastHost.show(context, 'Added to library');
           },
         );

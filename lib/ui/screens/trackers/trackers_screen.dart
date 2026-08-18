@@ -5,7 +5,7 @@ import '../../../core/design/tokens.dart';
 import '../../../data/models/models.dart';
 import '../../../data/services/trackers.dart';
 
-import 'package:flutter/material.dart' show Icons, Colors;
+import 'package:flutter/material.dart' show Icons;
 import '../../../ui/widgets/widgets.dart';
 class TrackersScreen extends StatefulWidget {
   const TrackersScreen({super.key, this.mangaKey});
@@ -97,7 +97,6 @@ class _TrackerCard extends StatefulWidget {
 }
 
 class _TrackerCardState extends State<_TrackerCard> {
-  bool _working = false;
 
   @override
   Widget build(BuildContext context) {
@@ -133,14 +132,15 @@ class _TrackerCardState extends State<_TrackerCard> {
           ),
           if (t.id == 'anilist' && !t.isLoggedIn)
             KButton(label: 'Log in', size: KButtonSize.sm, onTap: () async {
-              setState(() => _working = true);
               try {
                 await t.login();
+                if (!context.mounted) return;
                 KToastHost.show(context, 'Authorize in the browser, then paste your token below');
               } catch (e) {
+                if (!context.mounted) return;
                 KToastHost.show(context, e.toString());
               } finally {
-                setState(() => _working = false);
+                if (context.mounted) setState(() {});
               }
             })
           else if (t.id == 'anilist')
@@ -178,11 +178,12 @@ class _MangaTrackSectionState extends State<_MangaTrackSection> {
   }
 
   Future<void> _load() async {
+    final repos = context.app.repos;
     final parts = widget.mangaKey.split(':');
-    final manga = await context.app.repos.mangaByKey(parts[0], parts[1]);
+    final manga = await repos.mangaByKey(parts[0], parts[1]);
     Track? track;
     if (manga?.id != null) {
-      final tracks = await context.app.repos.tracksForManga(manga!.id!);
+      final tracks = await repos.tracksForManga(manga!.id!);
       track = tracks.firstOrNull;
     }
     if (mounted) {
@@ -195,6 +196,7 @@ class _MangaTrackSectionState extends State<_MangaTrackSection> {
   }
 
   Future<void> _save(Track updated) async {
+    final app = context.app;
     final manga = _manga;
     if (manga?.id == null) return;
     if (updated.remoteId == null && updated.trackerId != 'comicko') {
@@ -203,8 +205,8 @@ class _MangaTrackSectionState extends State<_MangaTrackSection> {
       if (linked == null) return;
       updated = updated.copyWith(remoteId: linked.remoteId, title: linked.title, totalChapters: linked.totalChapters);
     }
-    await context.app.repos.upsertTrack(updated);
-    final tracker = context.app.trackers.byId(updated.trackerId);
+    await app.repos.upsertTrack(updated);
+    final tracker = app.trackers.byId(updated.trackerId);
     try {
       await tracker.update(updated);
     } catch (e) {
@@ -263,7 +265,6 @@ class _MangaTrackSectionState extends State<_MangaTrackSection> {
   @override
   Widget build(BuildContext context) {
     final theme = context.kTheme;
-    final c = theme.colors;
     if (_loading) {
       return const Padding(padding: EdgeInsets.all(30), child: Center(child: KProgressRing(indeterminate: true, size: 24)));
     }

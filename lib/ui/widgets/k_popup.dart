@@ -43,8 +43,6 @@ class _KMenuButtonState extends State<KMenuButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.kTheme;
-    final c = theme.colors;
     return CompositedTransformTarget(
       link: _link,
       child: GestureDetector(

@@ -90,7 +90,6 @@ class _ReaderScreenState extends State<ReaderScreen> with SingleTickerProviderSt
 
   Future<void> _openChapter(int index) async {
     if (index < 0 || index >= _chapters.length) return;
-    final old = _session;
     _page = 0;
     setState(() {
       _chapterIndex = index;
@@ -126,17 +125,18 @@ class _ReaderScreenState extends State<ReaderScreen> with SingleTickerProviderSt
     if (total == 0 || _pageDirty == false && _page == 0) {
       // still record minimal
     }
+    final repos = context.app.repos;
     final percent = total == 0 ? 0.0 : (_page + 1) / total;
-    await context.app.repos.recordHistory(widget.manga.id!, chapter.id!, _page, percent);
-    await context.app.repos.updateChapter(chapter.copyWith(
+    await repos.recordHistory(widget.manga.id!, chapter.id!, _page, percent);
+    await repos.updateChapter(chapter.copyWith(
       lastPageRead: _page,
       lastReadAt: DateTime.now(),
       read: percent >= 0.95,
     ));
     // mark manga as started
-    final manga = await context.app.repos.mangaById(widget.manga.id!);
+    final manga = await repos.mangaById(widget.manga.id!);
     if (manga != null) {
-      await context.app.repos.updateManga(manga.copyWith(
+      await repos.updateManga(manga.copyWith(
         lastReadAt: DateTime.now(),
         lastChapterUrl: chapter.url,
       ));
@@ -320,6 +320,7 @@ class _ReaderScreenState extends State<ReaderScreen> with SingleTickerProviderSt
                     return;
                   }
                   await context.app.downloads.enqueue(widget.manga, _session.chapter);
+                  if (!mounted) return;
                   KToastHost.show(context, 'Download queued');
                 },
                 tone: KIconTone.plain,

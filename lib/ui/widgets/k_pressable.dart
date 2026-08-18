@@ -95,7 +95,6 @@ class _KPressableState extends State<KPressable> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.kTheme;
     return GestureDetector(
       behavior: widget.behavior,
       onTapDown: _onDown,

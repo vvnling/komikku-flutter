@@ -180,18 +180,9 @@ class _WebtoonViewerState extends State<WebtoonViewer> with TickerProviderStateM
   double get _pageWidth => MediaQuery.sizeOf(context).width;
   double get _pageHeight => MediaQuery.sizeOf(context).height;
 
-  // ── scrubber drag ─────────────────────────────────────────────────────────
-  void _scrub(double dy) {
-    if (!_scroll.hasClients) return;
-    final max = _scroll.position.maxScrollExtent;
-    final target = (dy / _pageHeight).clamp(0.0, 1.0) * max;
-    _scroll.jumpTo(target);
-    HapticFeedback.selectionClick();
-  }
 
   @override
   Widget build(BuildContext context) {
-    final c = context.kColors;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onScaleStart: _onScaleStart,

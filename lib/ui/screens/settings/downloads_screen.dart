@@ -115,6 +115,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   variant: KButtonVariant.danger,
                   onTap: () async {
                     await context.app.downloads.clearAllDownloads();
+                    if (!context.mounted) return;
                     KToastHost.show(context, 'All downloads cleared');
                   },
                 ),

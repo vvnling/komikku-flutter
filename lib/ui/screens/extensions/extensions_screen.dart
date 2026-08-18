@@ -109,10 +109,11 @@ class _ExtensionsScreenState extends State<ExtensionsScreen> {
   }
 
   Future<void> _scanFolder() async {
-    final path = await context.app.library.pickLocalRoot();
+    final app = context.app;
+    final path = await app.library.pickLocalRoot();
     if (path == null) return;
-    context.app.settings.localRoot = path;
-    final found = await context.app.library.scanLocalRoot(path);
+    app.settings.localRoot = path;
+    final found = await app.library.scanLocalRoot(path);
     final count = found.length;
     if (!mounted) return;
     setState(() {});
@@ -132,6 +133,7 @@ class _ExtensionsScreenState extends State<ExtensionsScreen> {
               title: sm.title,
               onTap: () async {
                 await context.app.library.addLocalEntry(sm, root: path);
+                if (!mounted) return;
                 KToastHost.show(context, 'Added ${sm.title}');
                 KRoute.pop(context);
               },

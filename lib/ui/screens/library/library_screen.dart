@@ -99,9 +99,6 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     final c = theme.colors;
     final settings = context.app.settings;
     final mangas = _mangas ?? const <Manga>[];
-    final count = _categoryId == null
-        ? mangas.length
-        : mangas.length;
 
     return SafeArea(
       bottom: false,
@@ -294,8 +291,6 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   }
 
   Widget _grid(List<Manga> mangas) {
-    final theme = context.kTheme;
-    final c = theme.colors;
     final width = MediaQuery.sizeOf(context).width;
     final cols = width >= KBreakpoints.desktop ? 7 : width >= KBreakpoints.tablet ? 5 : width >= 420 ? 4 : 3;
     final spacing = KSpacing.m;
@@ -316,7 +311,6 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
 
   Widget _gridItem(Manga m, double coverW, int index) {
     final theme = context.kTheme;
-    final c = theme.colors;
     final selected = _selected.contains(m.id);
     return GestureDetector(
       onLongPress: _bulkMode ? null : () {
@@ -400,30 +394,33 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   // ── actions ───────────────────────────────────────────────────────────────
 
   Future<void> _refreshAll() async {
+    final app = context.app;
     final mangas = _mangas ?? const <Manga>[];
     var i = 0;
     for (final m in mangas.take(20)) {
       i++;
-      context.app.library.syncState.value = SyncState(current: i, total: mangas.length, label: m.title);
+      app.library.syncState.value = SyncState(current: i, total: mangas.length, label: m.title);
       try {
-        await context.app.library.refreshManga(m);
+        await app.library.refreshManga(m);
       } catch (_) {}
     }
-    context.app.library.syncState.value = null;
+    app.library.syncState.value = null;
     await _reload();
   }
 
   Future<void> _seedDemo() async {
-    final source = context.app.sources.byId('demo')!;
+    final app = context.app;
+    final source = app.sources.byId('demo')!;
     final popular = await source.getPopular(1);
     var i = 0;
     for (final sm in popular) {
       i++;
-      context.app.library.syncState.value = SyncState(current: i, total: popular.length, label: sm.title);
-      final m = await context.app.library.addToLibrary(sm);
-      await context.app.library.refreshManga(m);
+      app.library.syncState.value = SyncState(current: i, total: popular.length, label: sm.title);
+      final m = await app.library.addToLibrary(sm);
+      await app.library.refreshManga(m);
     }
-    context.app.library.syncState.value = null;
+    app.library.syncState.value = null;
+    if (!mounted) return;
     KToastHost.show(context, 'Added ${popular.length} demo entries');
     await _reload();
   }
@@ -446,6 +443,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
             KButton(label: 'Create', onTap: () async {
               if (controller.text.trim().isEmpty) return;
               await context.app.repos.createCategory(controller.text.trim());
+              if (!mounted) return;
               KRoute.pop(context);
               _reload();
             }),
@@ -462,14 +460,17 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     final secondary = mangas.skip(1).map((m) => m.id!).toList();
     await context.app.library.mergeMangas(primary.id!, secondary);
     _exitBulk();
+    if (!mounted) return;
     KToastHost.show(context, 'Merged ${secondary.length} entries into ${primary.title}');
     await _reload();
   }
 
   Future<void> _categorizeSelected() async {
-    final repos = context.app.repos;
+    final app = context.app;
+    final repos = app.repos;
     final cats = await repos.allCategories();
     final controller = TextEditingController();
+    if (!mounted) return;
     await showKSheet<void>(context, child: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,6 +484,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
             final current = await repos.categoriesOfManga(id);
             await repos.setMangaCategories(id, [...current.map((x) => x.id!), cat.id!]);
           }
+          if (!mounted) return;
           KRoute.pop(context);
           KToastHost.show(context, 'Added to ${cat.name}');
           _reload();
@@ -496,6 +498,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                 final current = await repos.categoriesOfManga(id);
                 await repos.setMangaCategories(id, [...current.map((x) => x.id!), cat.id!]);
               }
+              if (!mounted) return;
               KRoute.pop(context);
               KToastHost.show(context, 'Added to ${cat.name}');
               _reload();
@@ -506,10 +509,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   }
 
   Future<void> _markSelected(bool read) async {
+    final repos = context.app.repos;
     for (final id in _selected) {
-      final m = _mangas!.firstWhere((x) => x.id == id);
-      for (final ch in await context.app.repos.chaptersOfManga(id)) {
-        await context.app.repos.setChapterRead(ch, read);
+      for (final ch in await repos.chaptersOfManga(id)) {
+        await repos.setChapterRead(ch, read);
       }
     }
     _exitBulk();
@@ -536,9 +539,11 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
       ],
     ));
     if (confirmed != true) return;
+    if (!mounted) return;
+    final library = context.app.library;
     for (final id in _selected) {
       final m = _mangas!.firstWhere((x) => x.id == id);
-      await context.app.library.removeFromLibrary(m);
+      await library.removeFromLibrary(m);
     }
     _exitBulk();
     await _reload();

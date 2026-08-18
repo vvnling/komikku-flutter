@@ -316,7 +316,6 @@ class KSegmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.kTheme;
     final c = theme.colors;
-    final index = options.indexWhere((o) => o.$1 == value);
     final width = expand ? double.infinity : null;
 
     Widget item(int i) {

@@ -21,8 +21,6 @@ class _MigrationScreenState extends State<MigrationScreen> {
   int _current = 0;
   bool _running = false;
   final Map<int, SourceManga?> _mapped = {};
-  final List<SourceManga> _candidates = const [];
-  bool _searching = false;
 
   @override
   void initState() {
@@ -59,21 +57,21 @@ class _MigrationScreenState extends State<MigrationScreen> {
       } catch (_) {}
     }
     setState(() => _running = false);
+    if (!mounted) return;
     KToastHost.show(context, 'Migration finished');
   }
 
   Future<void> _doMigrate(Manga m, SourceManga target) async {
-    await context.app.repos.removeFromLibrary(m.id!);
-    final added = await context.app.library.addToLibrary(target.copyWith(extra: {...?target.extra, 'fromSource': m.sourceId}));
+    final app = context.app;
+    await app.repos.removeFromLibrary(m.id!);
+    final added = await app.library.addToLibrary(target.copyWith(extra: {...?target.extra, 'fromSource': m.sourceId}));
     try {
-      await context.app.library.refreshManga(added);
+      await app.library.refreshManga(added);
     } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.kTheme;
-    final c = theme.colors;
 
     return KPage(
       child: Column(
@@ -128,7 +126,6 @@ class _MigrationScreenState extends State<MigrationScreen> {
     final c = context.kColors;
     final controller = TextEditingController(text: m.title);
     final selectedSource = ValueNotifier<Source>(sources.first);
-    setState(() => _searching = true);
     await showKSheet<void>(context, child: StatefulBuilder(
       builder: (context, setSheet) => Column(
         mainAxisSize: MainAxisSize.min,
@@ -182,10 +179,13 @@ class _MigrationScreenState extends State<MigrationScreen> {
                               subtitle: r.author,
                               trailing: const Icon(Icons.north_east, size: 16),
                               onTap: () async {
+                                if (!mounted) return;
                                 KRoute.pop(context);
                                 await _doMigrate(m, r);
+                                if (!context.mounted) return;
                                 setState(() => _mapped[m.id!] = r);
                                 await _load();
+                                if (!context.mounted) return;
                                 KToastHost.show(context, 'Migrated to ${r.title}');
                               },
                             ),
@@ -200,7 +200,6 @@ class _MigrationScreenState extends State<MigrationScreen> {
         ],
       ),
     ));
-    setState(() => _searching = false);
   }
 
   Future<List<SourceManga>> _searchFuture(Source source, String query) {

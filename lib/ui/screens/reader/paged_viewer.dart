@@ -62,16 +62,13 @@ class _PagedViewerState extends State<PagedViewer> with TickerProviderStateMixin
   // zoom (per current page)
   double _scale = 1;
   Offset _zoomOffset = Offset.zero;
-  final Offset _zoomFocal = Offset.zero;
   double _pinchStartScale = 1;
-  double _pinchStartFocalDist = 0;
   bool _zoomed = false;
   Offset _doubleTapFocal = Offset.zero;
   bool _chromeVisible = true;
 
   // autoscroll
   Ticker? _autoTicker;
-  double _autoPos = 0;
 
   Size _viewport = Size.zero;
   double get _pageWidth => _viewport.width;
@@ -110,7 +107,6 @@ class _PagedViewerState extends State<PagedViewer> with TickerProviderStateMixin
     _autoTicker = createTicker((elapsed) {
       if (!_flipping && !_zoomed && _dragging == false) {
         _dragDx += elapsed.inMicroseconds / 1000000 * 60 * widget.autoscrollSpeed;
-        _autoPos = _dragDx;
         if (mounted) setState(() {});
       }
     })..start();
@@ -120,14 +116,12 @@ class _PagedViewerState extends State<PagedViewer> with TickerProviderStateMixin
     _autoTicker?.dispose();
     _autoTicker = null;
     _dragDx = 0;
-    _autoPos = 0;
   }
 
   // ── gesture handling ──────────────────────────────────────────────────────
   void _onScaleStart(ScaleStartDetails d) {
     if (_flipping) return;
     _pinchStartScale = _scale;
-    _pinchStartFocalDist = 0;
     _lastDx = d.localFocalPoint.dx;
     _lastTime = SchedulerBinding.instance.currentFrameTimeStamp;
   }
@@ -165,14 +159,12 @@ class _PagedViewerState extends State<PagedViewer> with TickerProviderStateMixin
 
   void _onScaleEnd(ScaleEndDetails d) {
     _dragging = false;
-    _autoPos = 0;
     if (_zoomed && _scale > 1) {
       // keep zoom; clamp offset
       _clampZoom();
       return;
     }
     if (_flipping) return;
-    final forward = widget.readingRtl ? _dragDx < 0 : _dragDx < 0;
     final threshold = _pageWidth * 0.16;
     final commit = _dragDx.abs() > threshold || _velocity.abs() > 700;
     if (!commit) {
@@ -278,7 +270,6 @@ class _PagedViewerState extends State<PagedViewer> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       _viewport = constraints.biggest;
-      final c = context.kColors;
 
       return GestureDetector(
         behavior: HitTestBehavior.opaque,

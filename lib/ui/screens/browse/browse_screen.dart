@@ -201,8 +201,6 @@ class _BrowseScreenState extends State<BrowseScreen> with AutomaticKeepAliveClie
   }
 
   Widget _entryRow(SourceManga m, int index) {
-    final theme = context.kTheme;
-    final c = theme.colors;
     return KListTile(
       leading: SizedBox(
         width: 46,
@@ -217,6 +215,7 @@ class _BrowseScreenState extends State<BrowseScreen> with AutomaticKeepAliveClie
       onTap: () => KRoute.push(context, MangaDetailScreen(mangaKey: m.key)),
       onLongPress: () async {
         await context.app.library.addToLibrary(m);
+        if (!mounted) return;
         KToastHost.show(context, 'Added to library');
       },
     );

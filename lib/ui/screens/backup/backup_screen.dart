@@ -53,6 +53,7 @@ class _BackupScreenState extends State<BackupScreen> {
                                   Expanded(
                                     child: KButton(label: 'Restore', variant: KButtonVariant.secondary, icon: const Icon(Icons.download, size: 17), onTap: () async {
                                       final result = await backups.importFromFile();
+                                      if (!context.mounted) return;
                                       KToastHost.show(context, 'Restored ${result.imported} entries${result.skipped > 0 ? ', ${result.skipped} skipped' : ''}');
                                     }),
                                   ),

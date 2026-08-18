@@ -237,7 +237,6 @@ class KSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.kColors;
     return KTextField(
       controller: controller,
       focusNode: focusNode,
