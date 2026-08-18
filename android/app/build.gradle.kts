@@ -60,6 +60,7 @@ android {
             // Sign with the release keystore in CI; debug key otherwise.
             signingConfig = if (hasKeystore) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
             isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
