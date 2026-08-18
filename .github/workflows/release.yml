@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Codegen (drift)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android/keystore.jks
+          else
+            echo "No keystore secret — release will fall back to debug signing."
+          fi
+
+      - name: Build Android APK
+        run: flutter build apk --release
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Build web
+        run: |
+          flutter build web --release
+          dart compile js web/drift_worker.dart -o build/web/drift_worker.js -O4
+          cd build/web && zip -r ../comicko-web.zip . && cd ../..
+
+      - name: Build Linux
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev
+          flutter build linux --release
+          tar -C build/linux/x64/release/bundle -czf build/comicko-linux.tar.gz .
+
+      - name: Build Windows
+        run: |
+          flutter build windows --release
+          powershell -Command "Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/comicko-windows.zip -Force"
+
+      - name: Collect artifacts
+        run: |
+          ls -la build/*.apk build/*.zip build/*.tar.gz
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Comicko ${{ github.ref_name }}
+          body: |
+            ## Comicko ${{ github.ref_name }}
+
+            Komikku, rewritten in Flutter.
+
+            ### Assets
+            - `comicko.apk` — Android (universal APK)
+            - `comicko-web.zip` — Web build (serve statically)
+            - `comicko-linux.tar.gz` — Linux desktop bundle
+            - `comicko-windows.zip` — Windows desktop build
+
+            ### Notes
+            Android releases before signing secrets are configured use the
+            debug key — install updates over each other will require
+            uninstall. Configure `KEYSTORE_B64` / `KEYSTORE_PASSWORD` /
+            `KEY_ALIAS` / `KEY_PASSWORD` repository secrets for proper
+            release signing.
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/comicko-web.zip
+            build/comicko-linux.tar.gz
+            build/comicko-windows.zip
+          fail_on_unmatched_files: false
+          generate_release_notes: true
