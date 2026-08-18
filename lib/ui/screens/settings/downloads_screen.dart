@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:rive/rive.dart';
 import '../../../core/app_scope.dart';
 import '../../../core/design/k_theme.dart';
 import '../../../core/design/tokens.dart';
@@ -47,6 +48,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (active.isNotEmpty) ...[
+                          // Rive liquid-download state machine while work is queued
+                          const Center(child: _LiquidDownload(size: 84)),
+                          const SizedBox(height: 8),
+                        ],
                         Text('Queue', style: theme.text(KTypeStyle.label, size: 12, color: c.inkMuted)),
                         const SizedBox(height: 8),
                         if (active.isEmpty)
@@ -123,6 +129,36 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Rive state machine: the signature liquid-download morph. Drives the
+/// 'progress' numeric input when the artboard exposes one.
+class _LiquidDownload extends StatefulWidget {
+  const _LiquidDownload({this.size = 84});
+  final double size;
+
+  @override
+  State<_LiquidDownload> createState() => _LiquidDownloadState();
+}
+
+class _LiquidDownloadState extends State<_LiquidDownload> {
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: RiveWidgetBuilder(
+        fileLoader: FileLoader.fromAsset('assets/rive/liquid_download.riv', riveFactory: Factory.rive),
+        builder: (context, state) {
+          final loaded = state as RiveLoaded;
+          // The state machine advances on its own — the liquid download
+          // morphs continuously while downloads are in flight.
+          return RiveWidget(controller: loaded.controller);
+        },
+        onFailed: (_, __) => const SizedBox.shrink(),
       ),
     );
   }
