@@ -9,10 +9,18 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build & publish ${{ github.ref_name }}
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.targets }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            targets: 'android web linux'
+          - os: windows-latest
+            targets: 'windows'
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +38,7 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Decode signing keystore
+        if: runner.os == 'Linux'
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
@@ -40,19 +49,30 @@ jobs:
           fi
 
       - name: Build Android APK
+        if: contains(matrix.targets, 'android')
         run: flutter build apk --release
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
+      - name: Copy APK to artifact path
+        if: contains(matrix.targets, 'android')
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/comicko.apk
+
       - name: Build web
+        if: contains(matrix.targets, 'web')
         run: |
           flutter build web --release
           dart compile js web/drift_worker.dart -o build/web/drift_worker.js -O4
+
+      - name: Package web
+        if: contains(matrix.targets, 'web')
+        run: |
           cd build/web && zip -r ../comicko-web.zip . && cd ../..
 
       - name: Build Linux
+        if: contains(matrix.targets, 'linux')
         run: |
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev
@@ -60,13 +80,39 @@ jobs:
           tar -C build/linux/x64/release/bundle -czf build/comicko-linux.tar.gz .
 
       - name: Build Windows
+        if: contains(matrix.targets, 'windows')
+        shell: pwsh
         run: |
           flutter build windows --release
-          powershell -Command "Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/comicko-windows.zip -Force"
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/comicko-windows.zip -Force
 
-      - name: Collect artifacts
-        run: |
-          ls -la build/*.apk build/*.zip build/*.tar.gz
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: comicko-${{ matrix.os }}
+          path: |
+            build/comicko.apk
+            build/comicko-web.zip
+            build/comicko-linux.tar.gz
+            build/comicko-windows.zip
+          if-no-files-found: ignore
+
+  release:
+    name: Publish ${{ github.ref_name }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -76,7 +122,8 @@ jobs:
           body: |
             ## Comicko ${{ github.ref_name }}
 
-            Komikku, rewritten in Flutter.
+            Komikku, rewritten in Flutter — a free, open-source manga reader
+            with a hand-crafted design system (no Material/Cupertino).
 
             ### Assets
             - `comicko.apk` — Android (universal APK)
@@ -85,15 +132,9 @@ jobs:
             - `comicko-windows.zip` — Windows desktop build
 
             ### Notes
-            Android releases before signing secrets are configured use the
-            debug key — install updates over each other will require
-            uninstall. Configure `KEYSTORE_B64` / `KEYSTORE_PASSWORD` /
-            `KEY_ALIAS` / `KEY_PASSWORD` repository secrets for proper
-            release signing.
-          files: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/comicko-web.zip
-            build/comicko-linux.tar.gz
-            build/comicko-windows.zip
+            - iOS/macOS builds are produced locally with Xcode
+              (`flutter build ios|macos --release`).
+            - Android releases signed with the repository's release keystore.
+          files: artifacts/**
           fail_on_unmatched_files: false
           generate_release_notes: true
